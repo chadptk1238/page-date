@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page Date</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDF0F3;
+    --sheet: #FFFFFF;
+    --ink: #16233B;
+    --muted: #5C687B;
+    --line: #D4DAE1;
+    --mark: #1F4FD8;
+    --mark-soft: #E4EAFB;
+    --warn: #9A5B00;
+    --sans: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0F1620;
+      --sheet: #17202C;
+      --ink: #E7ECF3;
+      --muted: #94A1B4;
+      --line: #2A3647;
+      --mark: #86A6FF;
+      --mark-soft: #1E2B47;
+      --warn: #E0A64A;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  h1 { font-size: 1.125rem; font-weight: 600; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 24px; }
+
+  /* URL bar */
+  form { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1; min-width: 0;
+    font: inherit; color: inherit;
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  input[type="text"]::placeholder { color: var(--muted); opacity: .7; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    border: 0; border-radius: 10px;
+  }
+  form button { background: var(--mark); color: var(--sheet); padding: 12px 20px; }
+  form button:disabled { opacity: .6; cursor: progress; }
+  :focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+  .notice {
+    margin-top: 24px; padding: 14px 16px;
+    border: 1px solid var(--line); border-left: 3px solid var(--warn);
+    border-radius: 8px; background: var(--sheet);
+  }
+
+  /* Result */
+  #result { margin-top: 48px; }
+  .switch {
+    display: inline-flex; padding: 3px; gap: 2px;
+    background: var(--sheet); border: 1px solid var(--line); border-radius: 9px;
+  }
+  .switch button {
+    background: none; color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; font-weight: 500; font-size: .875rem;
+  }
+  .switch button[aria-pressed="true"] { background: var(--mark-soft); color: var(--mark); }
+
+  .date {
+    margin: 20px 0 0;
+    font-size: clamp(2.5rem, 9vw, 4.5rem);
+    font-weight: 700; line-height: 1.02; letter-spacing: -0.035em;
+  }
+  .date.none { color: var(--muted); font-size: clamp(1.75rem, 6vw, 2.5rem); letter-spacing: -0.02em; }
+  .sub { margin: 10px 0 0; color: var(--muted); }
+  .sub span + span { margin-left: 14px; }
+
+  h2 { font-size: 1rem; font-weight: 600; margin: 48px 0 12px; }
+  .how {
+    background: var(--sheet); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .how p { margin: 0; }
+  .how .where { font-weight: 600; }
+  .how .about { color: var(--muted); margin-top: 2px; }
+  .how ul.src { margin-top: 12px; }
+  .verdict { font-weight: 500; font-size: .875rem; margin-top: 12px; }
+  .verdict.sure { color: var(--mark); }
+  .verdict.unsure { color: var(--warn); }
+  .versus { color: var(--muted); font-size: .875rem; margin-top: 6px; }
+  pre {
+    margin: 12px 0 0; padding: 10px 12px;
+    background: var(--paper); border-radius: 8px;
+    font: 13px/1.5 var(--code);
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+
+  /* Candidate dates, with Jev's probability for the current question */
+  ul.cands { list-style: none; margin: 0; padding: 0; }
+  ul.cands > li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .cand-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .cand-date { font-weight: 500; }
+  .cand-date small { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: .875rem; }
+  .cand-pct { color: var(--muted); font-size: .875rem; white-space: nowrap; }
+  .bar { height: 4px; border-radius: 2px; background: var(--line); margin: 8px 0 10px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--muted); border-radius: 2px; }
+  li.picked .cand-date { font-weight: 700; }
+  li.picked .cand-pct { color: var(--mark); font-weight: 600; }
+  li.picked .bar i { background: var(--mark); }
+  ul.src { list-style: none; margin: 0; padding: 0; font-size: .875rem; color: var(--muted); }
+  ul.src li { padding: 2px 0; overflow-wrap: anywhere; }
+  ul.src code { font: 12.5px/1.5 var(--code); margin-left: 6px; opacity: .85; }
+  summary { cursor: pointer; color: var(--muted); font-size: .875rem; margin-top: 2px; }
+
+  /* The 12 htmldate checks: a real sequence, so it is numbered */
+  ol.trail { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  ol.trail li {
+    counter-increment: step;
+    display: grid; grid-template-columns: 28px 1fr auto; column-gap: 10px;
+    align-items: baseline;
+    padding: 9px 0; border-bottom: 1px solid var(--line);
+  }
+  ol.trail li::before {
+    content: counter(step);
+    color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums;
+  }
+  ol.trail .state { color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums; }
+  ol.trail li.hit .state { color: var(--ink); }
+  ol.trail li.agrees .state { color: var(--mark); font-weight: 600; }
+  ol.trail li.miss .name { color: var(--muted); }
+  ol.trail details { grid-column: 2 / -1; }
+
+  .fetch { margin-top: 48px; color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
+
+  @media (max-width: 520px) {
+    main { padding-top: 32px; }
+    form { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Page Date</h1>
+  <p class="lede">Paste a link. Every date on the page gets collected, then Jev picks the one it was published on.</p>
+
+  <form id="form">
+    <input id="url" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+           placeholder="https://example.com/blog/some-post" aria-label="Page URL" autofocus>
+    <button id="go" type="submit">Find date</button>
+  </form>
+
+  <div id="notice" class="notice" hidden></div>
+  <section id="result" hidden></section>
+</main>
+
+<script>
+const form = document.getElementById("form");
+const input = document.getElementById("url");
+const go = document.getElementById("go");
+const notice = document.getElementById("notice");
+const result = document.getElementById("result");
+
+let data = null;
+let view = "published";
+
+const VIEW = {
+  published: { noun: "publish date", pass: "publish pass" },
+  updated: { noun: "last-updated date", pass: "update pass" },
+};
+
+// tiny DOM helper: el("p", {class: "x"}, "text" | node, ...)
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  for (const child of children) node.append(child);
+  return node;
+}
+
+function longDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
+function ago(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const then = new Date(y, m - 1, d), now = new Date();
+  const days = Math.round((now.setHours(0, 0, 0, 0) - then) / 86400000);
+  if (days < 0) return "in the future";
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 60) return days + " days ago";
+  const months = Math.floor(days / 30.44);
+  if (months < 24) return months + " months ago";
+  const years = Math.floor(months / 12), rest = months % 12;
+  return years + " years" + (rest ? ", " + rest + " months" : "") + " ago";
+}
+
+const pct = (p) => Math.round(p * 100) + "%";
+
+// where a candidate date was found: label plus what was matched
+function sourceList(sources, limit = 3) {
+  const row = (s) => el("li", {},
+    s.where + (s.pass ? " (" + s.pass + ")" : ""),
+    ...(s.detail ? [el("code", {}, s.detail)] : []));
+  const list = el("ul", { class: "src" }, ...sources.slice(0, limit).map(row));
+  if (sources.length <= limit) return list;
+  const more = sources.length - limit;
+  return el("div", {}, list,
+    el("details", {}, el("summary", {}, more + " more place" + (more > 1 ? "s" : "")),
+      el("ul", { class: "src" }, ...sources.slice(limit).map(row))));
+}
+
+function render() {
+  const pick = data[view];
+  const noun = VIEW[view].noun;
+  const jev = data.jev;
+  const chosen = data.candidates.find((c) => c.id === pick.candidate_id);
+  const count = data.candidates.length;
+  const firstHit = pick.steps.find((step) => step.key === pick.htmldate_check);
+  result.replaceChildren();
+
+  // published / last updated switch
+  const sw = el("div", { class: "switch", role: "group", "aria-label": "Which date" });
+  for (const [key, label] of [["published", "Published"], ["updated", "Last updated"]]) {
+    const b = el("button", { type: "button", "aria-pressed": String(view === key) }, label);
+    b.onclick = () => { view = key; render(); };
+    sw.append(b);
+  }
+  result.append(sw);
+
+  // the date
+  if (pick.date) {
+    result.append(
+      el("p", { class: "date" }, longDate(pick.date)),
+      el("p", { class: "sub" }, el("span", {}, ago(pick.date)), el("span", {}, pick.date)),
+    );
+  } else {
+    result.append(
+      el("p", { class: "date none" }, "No " + noun + " on this page"),
+      el("p", { class: "sub" }, count
+        ? "Dates were found, but none of them is a real " + noun + ". Homepages and landing pages usually have none."
+        : "None of the checks turned up a date."),
+    );
+  }
+
+  // why this date
+  result.append(el("h2", {}, pick.date ? "Why this date" : "Why no date"));
+  const how = el("div", { class: "how" });
+  const htmldateSays = pick.htmldate_date
+    ? longDate(pick.htmldate_date) + (firstHit ? ", from its check “" + firstHit.label + "”" : "")
+    : null;
+
+  if (pick.picked_by === "jev") {
+    const sure = pick.confidence >= 0.7;
+    if (chosen) {
+      how.append(
+        el("p", { class: "where" }, "Jev picked this out of " + count + " candidate date" + (count > 1 ? "s" : "")),
+        el("p", { class: "about" }, "It is found in " + chosen.sources.length + " place" + (chosen.sources.length > 1 ? "s" : "") + " on the page" + (chosen.sources.length > 3 ? ". The first three:" : ":")),
+        sourceList(chosen.sources.slice(0, 3)),
+        el("p", { class: "verdict " + (sure ? "sure" : "unsure") },
+          sure ? "Jev is " + pct(pick.confidence) + " sure."
+               : "Jev is only " + pct(pick.confidence) + " sure. Check the other candidates below."),
+      );
+    } else {
+      how.append(
+        el("p", { class: "where" }, "Jev ruled out all " + count + " candidate date" + (count > 1 ? "s" : "")),
+        el("p", { class: "about" }, "None of them reads as a real " + noun + " for this page."),
+        el("p", { class: "verdict " + (sure ? "sure" : "unsure") },
+          sure ? "Jev is " + pct(pick.confidence) + " sure."
+               : "Jev is only " + pct(pick.confidence) + " sure. Check the candidates below."),
+      );
+    }
+    if (htmldateSays) {
+      how.append(el("p", { class: "versus" }, pick.htmldate_date === pick.date
+        ? "htmldate's own first match agrees."
+        : "htmldate on its own would have said " + htmldateSays + "."));
+    }
+  } else {
+    how.append(
+      el("p", { class: "where" }, pick.date ? "htmldate's first match" : "Nothing found"),
+      el("p", { class: "about" }, "Jev did not pick this one. " + jev.reason),
+    );
+    if (firstHit) {
+      how.append(el("p", { class: "about" }, "From the check “" + firstHit.label + "”. " + firstHit.about));
+      if (firstHit.evidence) how.append(el("pre", {}, firstHit.evidence));
+    }
+  }
+  result.append(how);
+
+  // every candidate date
+  if (count) {
+    result.append(el("h2", {}, "Every date found on the page"));
+    const list = el("ul", { class: "cands" });
+    for (const c of data.candidates) {
+      const p = pick.probabilities[c.id];
+      const li = el("li", { class: c.id === pick.candidate_id ? "picked" : "" });
+      const head = el("div", { class: "cand-head" },
+        el("span", { class: "cand-date" }, longDate(c.date), el("small", {}, c.date)));
+      if (p !== undefined) head.append(el("span", { class: "cand-pct" }, pct(p) + " " + noun));
+      li.append(head);
+      if (p !== undefined) {
+        const fill = el("i");
+        fill.style.width = Math.max(p * 100, 0) + "%";
+        li.append(el("div", { class: "bar" }, fill));
+      }
+      li.append(sourceList(c.sources));
+      list.append(li);
+    }
+    if (pick.probabilities.none !== undefined) {
+      const li = el("li", { class: pick.picked_by === "jev" && !chosen ? "picked" : "" });
+      const fill = el("i");
+      fill.style.width = pick.probabilities.none * 100 + "%";
+      li.append(
+        el("div", { class: "cand-head" },
+          el("span", { class: "cand-date" }, "None of these"),
+          el("span", { class: "cand-pct" }, pct(pick.probabilities.none))),
+        el("div", { class: "bar" }, fill));
+      list.append(li);
+    }
+    result.append(list);
+  }
+
+  // all 12 checks for this pass
+  if (pick.steps.length) {
+    result.append(el("h2", {}, "All 12 htmldate checks, " + VIEW[view].pass));
+    const trail = el("ol", { class: "trail" });
+    for (const step of pick.steps) {
+      const agrees = step.date && step.date === pick.date;
+      const li = el("li", { class: step.status + (agrees ? " agrees" : ""), title: step.about },
+        el("span", { class: "name" }, step.label),
+        el("span", { class: "state" }, step.date || "Nothing"),
+      );
+      if (step.evidence || step.log.length) {
+        const body = [step.evidence, ...step.log].filter(Boolean).join("\n");
+        li.append(el("details", {}, el("summary", {}, step.date ? "What it matched" : "htmldate log"), el("pre", {}, body)));
+      }
+      trail.append(li);
+    }
+    result.append(trail);
+  }
+
+  // fetch and Jev details
+  const f = data.fetch;
+  const kb = (f.bytes / 1024).toFixed(0);
+  let line = `Fetched with curl_cffi as ${f.impersonate}${f.proxied ? " through your proxy" : ""}. HTTP ${f.status}, ${f.elapsed_ms} ms, ${kb} KB. Final URL: ${f.final_url}`;
+  result.append(el("p", { class: "fetch" }, line));
+  if (jev.used) {
+    result.append(el("p", { class: "fetch", style: "margin-top:6px" },
+      `Decided by ${jev.model}. ${jev.input_tokens} tokens, $${jev.cost_usd.toFixed(5)}. Chance this is a dated piece of content: ${pct(jev.dated)}.`));
+  }
+
+  result.hidden = false;
+}
+
+async function lookup(url) {
+  go.disabled = true;
+  go.textContent = "Finding date";
+  notice.hidden = true;
+  result.hidden = true;
+  try {
+    const response = await fetch("/api/date?url=" + encodeURIComponent(url));
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Something went wrong on the server.");
+    data = body;
+    view = "published";
+    render();
+    history.replaceState(null, "", "?url=" + encodeURIComponent(url));
+  } catch (err) {
+    notice.textContent = err.message;
+    notice.hidden = false;
+  } finally {
+    go.disabled = false;
+    go.textContent = "Find date";
+  }
+}
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const url = input.value.trim();
+  if (url) lookup(url);
+});
+
+// shareable links: /?url=https://...
+const preset = new URLSearchParams(location.search).get("url");
+if (preset) { input.value = preset; lookup(preset); }
+</script>
+</body>
+</html>
