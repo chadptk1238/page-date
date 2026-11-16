@@ -13,7 +13,6 @@ Key: TYPESAFE_API_KEY, or typesafe_key (the name it has in Infisical, so
 """
 
 import os
-from datetime import date
 
 from curl_cffi import requests
 
@@ -27,7 +26,11 @@ RULES = (
     "(JSON-LD datePublished or dateModified, article:published_time or article:modified_time meta tags, "
     "a time tag by the headline, a date in the URL) over dates that merely appear in body text, "
     "comments, related links, image paths, footers or copyright lines. An HTTP Last-Modified header "
-    "often just reflects a server or cache refresh, not the content."
+    "often just reflects a server or cache refresh, not the content. "
+    "A date written in the visible page and labelled Published, Posted or 'By <name> on', sitting next to "
+    "the headline, is strong evidence of the publish date. A date in site chrome (masthead, navigation, "
+    "sidebar, footer, widgets) that equals today's date is the masthead clock or a widget, not the publish "
+    "date, unless that same date is also labelled Published or Posted next to the headline."
 )
 
 
@@ -40,7 +43,7 @@ def _describe(candidate: dict) -> str:
     return f"{candidate['date']}, found in: {places}"
 
 
-def pick_dates(url: str, context: dict, candidates: list[dict]) -> dict:
+def pick_dates(url: str, context: dict, candidates: list[dict], today: str) -> dict:
     """Returns {"used": True, published, updated, dated, ...} or {"used": False, "reason": ...}."""
     key = _api_key()
     if not key:
@@ -50,7 +53,7 @@ def pick_dates(url: str, context: dict, candidates: list[dict]) -> dict:
 
     state = {
         "task": "Work out when this web page was published and when it was last updated.",
-        "today": date.today().isoformat(),
+        "today": today,  # the day the page was fetched
         "page": {"url": url, **context},
         "candidates": [
             {

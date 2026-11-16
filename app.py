@@ -16,6 +16,7 @@ Open:  http://127.0.0.1:8765
 API:   http://127.0.0.1:8765/api/date?url=https://example.com/some-post
 """
 
+from datetime import date
 from pathlib import Path
 
 import uvicorn
@@ -26,6 +27,7 @@ from services.decide.candidates import build_candidates
 from services.decide.typesafe_jev import pick_dates
 from services.extract.htmldate_finder import run_all_checks
 from services.extract.selectolax_signals import collect_signals, page_context
+from services.extract.visible_dates import find_visible_dates
 from services.fetch.curl_cffi_client import FetchError, fetch_page
 
 HOST, PORT = "127.0.0.1", 8765
@@ -39,22 +41,9 @@ def index():
     return FileResponse(STATIC / "index.html")
 
 
-@app.get("/api/date")
-def page_date(url: str):
-    url = url.strip()
-    if not url:
-        return JSONResponse({"error": "Paste a URL first."}, status_code=400)
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-
-    # 1. fetch
-    try:
-        page = fetch_page(url)
-    except FetchError as err:
-        return JSONResponse({"error": str(err)}, status_code=502)
-
-    html = page.pop("html")
-    final_url = page["final_url"]
+def analyze(html: str, final_url: str, last_modified: str | None = None, today: str | None = None) -> dict:
+    """Steps 2 to 5 on an already-fetched page. `today` is the day the page was fetched (YYYY-MM-DD)."""
+    today = today or date.today().isoformat()
 
     # 2. run all 12 htmldate checks, twice: once looking for the publish date, once for the last update
     checks = {
@@ -63,11 +52,14 @@ def page_date(url: str):
     }
 
     # 3. every date the page states outright (headers, URL, meta tags, JSON-LD, time tags)
-    signals = collect_signals(html, final_url, page["last_modified"])
+    signals = collect_signals(html, final_url, last_modified)
+
+    # 3b. every date written in the visible page, with where it sits (byline, body, masthead...)
+    visible = find_visible_dates(html, today)
 
     # 4. one candidate per distinct date, then Jev picks the right one for each question
-    candidates = build_candidates(checks["published"], checks["updated"], signals)
-    jev = pick_dates(final_url, page_context(html), candidates)
+    candidates = build_candidates(checks["published"], checks["updated"], signals, visible)
+    jev = pick_dates(final_url, page_context(html), candidates, today)
 
     # 5. final answer per view: Jev's pick if it ran, otherwise htmldate's first hit
     result = {}
@@ -85,13 +77,29 @@ def page_date(url: str):
         result[view] = {**pick, **checks[view]}
 
     return {
-        "url": url,
-        "fetch": page,
         "candidates": candidates,
         "jev": {key: value for key, value in jev.items() if key not in ("published", "updated")},
         "published": result["published"],
         "updated": result["updated"],
     }
+
+
+@app.get("/api/date")
+def page_date(url: str):
+    url = url.strip()
+    if not url:
+        return JSONResponse({"error": "Paste a URL first."}, status_code=400)
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    # 1. fetch
+    try:
+        page = fetch_page(url)
+    except FetchError as err:
+        return JSONResponse({"error": str(err)}, status_code=502)
+
+    html = page.pop("html")
+    return {"url": url, "fetch": page, **analyze(html, page["final_url"], page["last_modified"])}
 
 
 if __name__ == "__main__":

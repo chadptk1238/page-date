@@ -27,9 +27,11 @@ app.py                                  routes, wires the steps together
 services/fetch/curl_cffi_client.py      1. fetch the page as Chrome (curl_cffi)
 services/extract/htmldate_finder.py     2. run all 12 htmldate checks, publish pass and update pass
 services/extract/selectolax_signals.py  3. every date the page states outright + page context (selectolax)
+services/extract/visible_dates.py       3b. every date written in the visible page, with where it sits (lxml)
 services/decide/candidates.py           4a. merge it all into one candidate per distinct date
 services/decide/typesafe_jev.py         4b. Jev picks the publish date and the last-updated date
 static/index.html                       the UI, plain HTML/CSS/JS
+tests/truth.csv, tests/run_eval.py      44 pages with known publish dates, and the script that scores them
 ```
 
 ## How the pick works
@@ -38,6 +40,13 @@ static/index.html                       the UI, plain HTML/CSS/JS
 copyright year in a footer becomes "January 1". Here all 12 checks run to the end,
 in both modes, and their dates are merged with the page's raw signals (HTTP header,
 URL, meta tags, JSON-LD, time tags) into one list of candidates.
+
+A third source reads the page the way a person does: every date written in the
+visible text or a `<time>` tag, tagged with where it sits (article header, article
+body, site chrome), the word right before it ("Published", "Posted", "Updated"),
+and how far it is from the headline. That is what gets a byline like "Published on
+September 11, 2024" onto the list, and what lets Jev tell it apart from a masthead
+clock showing today's date.
 
 Jev gets one request with the page context and the candidates, and answers three
 questions: is this a dated piece of content, which candidate is the publish date,
@@ -48,3 +57,15 @@ A lookup is about 1,000 to 2,500 input tokens, roughly $0.0001.
 htmldate's own answer is still shown next to Jev's, so you can see when they differ.
 
 Because `htmldate_finder.py` calls htmldate internals, htmldate is pinned to 1.11.0.
+
+## Test it
+
+```
+infisical run --env=dev -- uv run tests/run_eval.py
+```
+
+Scores Jev's publish-date pick on the 44 pages in `tests/truth.csv` and prints
+right or wrong per page, the total, and the Jev token cost (about $0.004 a run).
+Pages are cached in `tests/.cache` with the day they were fetched, so reruns don't
+refetch; add `--refetch` to start clean. Each run also prints which answers changed
+since the last one. Current score: 43/44.
